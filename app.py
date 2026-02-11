@@ -4,29 +4,27 @@ import pandas as pd
 from datetime import datetime
 import pytz
 
-# --- 1. 設定區：圖片與參數 ---
-# 請確保 logo.png 已上傳至您的 GitHub 儲存庫
+# --- 1. 設定區 ---
 LOGO_URL = "https://raw.githubusercontent.com/Fatush1452/OSE-gold-app/main/OSE.png"
 
 st.set_page_config(page_title="黃金量化分析儀表板", layout="wide")
 
-# --- 2. 顯示 Logo 與 標題 (比例調整為 1:3 讓 Logo 有空間放大) ---
+# --- 2. 顯示 Logo 與 標題 ---
 t_col1, t_col2 = st.columns([1, 3])
 with t_col1:
     try:
-        # width=250 讓圖片更大，您也可以根據需求調整為 200 或 300
         st.image(LOGO_URL, width=250)
     except:
-        st.write("🏮 [請檢查 Logo 連結]")
+        st.write("🏮 [Logo]")
 with t_col2:
     st.title("黃金多空因子量化儀表板")
 
-# --- 3. 更新時間顯示 (台北時間) ---
+# --- 3. 更新時間 (台北) ---
 tw_tz = pytz.timezone('Asia/Taipei')
 now_tw = datetime.now(tw_tz).strftime('%Y-%m-%d %H:%M:%S')
 st.caption(f"🕒 數據最後更新時間 (台北)：{now_tw}")
 
-# --- 4. 側邊欄：權重設定與 OSE 自評輸入 ---
+# --- 4. 側邊欄設定 ---
 st.sidebar.header("1. 設定因子權重 (%)")
 w_dxy = st.sidebar.slider("美元指數 (DXY)", 0, 100, 25)
 w_vix = st.sidebar.slider("避險情緒 (VIX)", 0, 100, 25)
@@ -35,14 +33,11 @@ w_ose = st.sidebar.slider("OSE 自評因子", 0, 100, 25)
 
 st.sidebar.divider()
 st.sidebar.header("2. OSE 買進需求評分")
-# 手填數字欄位 1-5
 ose_input = st.sidebar.number_input("OSE 需求強度 (1-5)", min_value=1, max_value=5, value=3, step=1)
-st.sidebar.caption("說明：5 代表強烈需求(利多)，1 代表無需求(利空)。")
 
-# 檢查權重總和
 total_w = w_dxy + w_vix + w_rate + w_ose
 if total_w != 100:
-    st.sidebar.error(f"⚠️ 權重總和：{total_w}% (須調整為 100%)")
+    st.sidebar.error(f"⚠️ 權重總和：{total_w}% (須為 100%)")
 
 # --- 5. 數據抓取 ---
 tickers = {"Gold": "GC=F", "DXY": "DX-Y.NYB", "VIX": "^VIX", "10Y_Bond": "^TNX"}
@@ -54,18 +49,16 @@ def get_data():
         inv_tickers = {v: k for k, v in tickers.items()}
         df = df.rename(columns=inv_tickers).dropna()
         return df
-    except Exception as e:
-        st.error(f"數據抓取失敗: {e}")
+    except:
         return None
 
-# --- 6. 主要邏輯判斷 ---
 df = get_data()
 
 if df is not None:
     curr = df.iloc[-1]
     prev = df.iloc[-2]
 
-    # --- 區塊 A：即時數據儀表板 ---
+    # --- 區塊 A：即時數據指標 ---
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("當前金價 (期貨)", f"${curr['Gold']:.1f}", f"{(curr['Gold']-prev['Gold']):.1f}")
     m2.metric("美元指數 (DXY)", f"{curr['DXY']:.2f}", f"{(curr['DXY']-prev['DXY']):.2f}", delta_color="inverse")
@@ -75,28 +68,40 @@ if df is not None:
     # --- 區塊 B：因子解讀指南 ---
     with st.expander("📖 因子解讀指南：為什麼這些指標會影響金價？"):
         g_col1, g_col2, g_col3 = st.columns(3)
-        g_col1.write("**美元指數 (DXY)** \n通常與金價**反向**。美元走強，黃金相對變貴，需求下降。")
-        g_col2.write("**10Y美債收益率** \n通常與金價**反向**。利率高則持有黃金的「機會成本」增加。")
-        g_col3.write("**VIX 恐慌指數** \n通常與金價**正向**。市場動盪時，避險資金會流入黃金。")
-        st.info(f"💡 **OSE 自評因子 (當前輸入: {ose_input})**: 由 OSE 內部評估。5分代表需求旺盛(利多)，1分代表需求疲軟(利空)。")
+        g_col1.write("**美元指數 (DXY)** \n與金價**反向**。")
+        g_col2.write("**10Y美債收益率** \n與金價**反向**。")
+        g_col3.write("**VIX 恐慌指數** \n與金價**正向**。")
 
     st.divider()
 
-    # --- 7. 加權得分計算 (以 50 分為中性分界) ---
-    # 客觀指標得分 (-1 或 1)
+    # --- 🚩 新增區塊：四個外部因子的即時走勢圖 ---
+    st.subheader("📈 外部因子走勢追蹤 (近一個月)")
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.caption("黃金現價趨勢")
+        st.line_chart(df['Gold'], height=150, use_container_width=True)
+    with c2:
+        st.caption("美元指數 (DXY)")
+        st.line_chart(df['DXY'], height=150, use_container_width=True)
+    with c3:
+        st.caption("10Y美債收益率")
+        st.line_chart(df['10Y_Bond'], height=150, use_container_width=True)
+    with c4:
+        st.caption("VIX 恐慌指數")
+        st.line_chart(df['VIX'], height=150, use_container_width=True)
+
+    st.divider()
+
+    # --- 區塊 C：綜合量化結論 ---
+    # 計算得分
     s_dxy = 1 if curr['DXY'] < prev['DXY'] else -1
     s_vix = 1 if curr['VIX'] > prev['VIX'] else -1
     s_rate = 1 if curr['10Y_Bond'] < prev['10Y_Bond'] else -1
-    
-    # OSE 分數映射：1->-1, 2->-0.5, 3->0, 4->0.5, 5->1
     s_ose = (ose_input - 3) / 2
     
-    # 原始加權分數 (-100 ~ 100)
     raw_score = (s_dxy * w_dxy + s_vix * w_vix + s_rate * w_rate + s_ose * w_ose)
-    # 映射到 0 ~ 100 分 (50 為中性)
     display_score = (raw_score + 100) / 2
 
-    # --- 區塊 C：結論建議 ---
     st.subheader("💡 綜合量化結論")
     score_col, advice_col = st.columns([1, 2])
     
@@ -111,20 +116,19 @@ if df is not None:
     with advice_col:
         st.write("### 戰略建議")
         if display_score >= 75:
-            st.success("🟢 **強力利多**：內外部因子同步共振，看漲趨勢明確。")
+            st.success("🟢 **強力利多**：各項指標同步支持上漲。")
         elif display_score > 50:
-            st.info("🟡 **偏多觀望**：整體環境偏好，可分批建立多單。")
+            st.info("🟡 **偏多觀望**：環境偏好，建議分批佈局。")
         elif display_score == 50:
-            st.warning("⚪ **中性**：多空指標抵銷，建議維持低水位觀望。")
+            st.warning("⚪ **中性**：方向不明，建議維持低水位。")
         else:
-            st.error("🔴 **看空/風險**：環境不利或需求疲軟，應注意回檔風險。")
+            st.error("🔴 **看空建議**：目前環境不利於持有黃金。")
 
     st.divider()
 
-    # --- 區塊 D：歸一化圖表 ---
-    st.subheader("📈 因子趨勢對照 (歸一化 100%)")
-    df_pct = (df / df.iloc[0] * 100)
-    st.line_chart(df_pct)
+    # --- 區塊 D：歸一化圖表 (放在最底部的對照參考) ---
+    st.subheader("📊 因對聯動對照 (歸一化 100%)")
+    st.line_chart(df / df.iloc[0] * 100)
 
 else:
-    st.warning("暫時無法獲取行情數據，請確認網路連線或稍後再試。")
+    st.error("數據獲取失敗，請重新整理頁面。")
