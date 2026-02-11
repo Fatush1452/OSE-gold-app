@@ -15,7 +15,7 @@ t_col1, t_col2 = st.columns([1, 5])
 with t_col1:
     # 使用 try-except 以防圖片連結失效時網頁仍能運作
     try:
-        st.image(LOGO_URL, width=120)
+        st.image(LOGO_URL, width=200)
     except:
         st.write("🏮 [Logo]")
 with t_col2:
