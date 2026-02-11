@@ -43,24 +43,53 @@ try:
     col3.metric("10Y美債收益率", f"{curr['10Y_Bond']:.2f}%", f"{(curr['10Y_Bond']-prev['10Y_Bond']):.2f}%", delta_color="inverse")
     col4.metric("VIX 恐慌指數", f"{curr['VIX']:.2f}", f"{(curr['VIX']-prev['VIX']):.2f}")
 
-    # --- 區塊 B：新手教學 (位置更換到指標下方) ---
+    # --- 區塊 B：新手教學 (位置調整至指標下方) ---
     with st.expander("📖 因子解讀指南：為什麼這些指標會影響金價？"):
         g_col1, g_col2, g_col3 = st.columns(3)
-        g_col1.write("**美元指數 (DXY)** \n黃金以美元計價。當美元變強，黃金相對變貴，需求下降。  \n👉 *通常與金價反向*")
-        g_col2.write("**10Y美債收益率** \n黃金不孳息。當美債利息變高，持有黃金的機會成本增加。  \n👉 *通常與金價反向*")
-        g_col3.write("**VIX 恐慌指數** \n反映市場恐慌。股市動盪或地緣政治緊張時，資金湧入黃金。  \n👉 *通常與金價正向*")
+        g_col1.write("**美元指數 (DXY)** \n通常與金價**反向**。美元強則金價受壓。")
+        g_col2.write("**10Y美債收益率** \n通常與金價**反向**。利率高則持有黃金成本變高。")
+        g_col3.write("**VIX 恐慌指數** \n通常與金價**正向**。市場恐慌時避險資金湧入黃金。")
 
     st.divider()
 
-    # --- 計算得分 (以 50 分為中性基準) ---
-    # 原始得分為 -100 ~ 100，我們將其轉換為 0 ~ 100 區間
+    # --- 計算得分 (以 50 分為基準) ---
     s_dxy = 1 if curr['DXY'] < prev['DXY'] else -1
     s_vix = 1 if curr['VIX'] > prev['VIX'] else -1
     s_rate = 1 if curr['10Y_Bond'] < prev['10Y_Bond'] else -1
     
-    raw_score = (s_dxy * w_dxy + s_vix * w_vix + s_rate * w_rate) # 範圍 -100 ~ 100
-    display_score = (raw_score + 100) / 2  # 轉換為 0 ~ 100，50分為中性
+    raw_score = (s_dxy * w_dxy + s_vix * w_vix + s_rate * w_rate) # -100 ~ 100
+    display_score = (raw_score + 100) / 2  # 映射到 0 ~ 100
 
     # --- 區塊 C：綜合結論建議 ---
     st.subheader("💡 綜合量化結論")
-    score
+    score_col, advice_col = st.columns([1, 2])
+    
+    with score_col:
+        st.write("### 綜合評分")
+        if display_score > 50:
+            st.markdown(f"<h1 style='color: #2ecc71;'>{display_score:.0f} 分 (看多)</h1>", unsafe_allow_html=True)
+        elif display_score < 50:
+            st.markdown(f"<h1 style='color: #e74c3c;'>{display_score:.0f} 分 (看空)</h1>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<h1 style='color: #f1c40f;'>50 分 (中性)</h1>", unsafe_allow_html=True)
+
+    with advice_col:
+        st.write("### 戰略建議")
+        if display_score >= 75:
+            st.success("🟢 **強力利多**：環境極其有利。")
+        elif display_score > 50:
+            st.info("🟡 **偏多觀望**：環境整體偏好，但需留意個別指標波動。")
+        elif display_score == 50:
+            st.warning("⚪ **中性**：多空因子互相抵銷，方向不明。")
+        else:
+            st.error("🔴 **看空建議**：目前持有黃金機會成本過高或風險較大。")
+
+    st.divider()
+
+    # --- 區塊 D：趨勢圖 ---
+    st.subheader("📈 因子走勢對照 (歸一化 100%)")
+    df_pct = (df / df.iloc[0] * 100)
+    st.line_chart(df_pct)
+
+except Exception as e:
+    st.error(f"發生錯誤: {e}")
