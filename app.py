@@ -6,7 +6,7 @@ import pytz
 
 # --- 1. 圖片網址設定 ---
 # 請確保 logo.png 已上傳至您的 GitHub 儲存庫
-LOGO_URL = "https://raw.githubusercontent.com/Fatush1452/OSE-gold-app/main/logo.png"
+LOGO_URL = "https://raw.githubusercontent.com/Fatush1452/OSE-gold-app/main/OSE.png"
 
 st.set_page_config(page_title="黃金量化分析儀表板", layout="wide")
 
