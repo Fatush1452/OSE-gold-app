@@ -2,64 +2,70 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# 網頁標題
-st.set_page_config(page_title="黃金量化決策儀表板", layout="wide")
-st.title("🏆 黃金多空因子量化分析網頁")
+st.set_page_config(page_title="黃金量化分析", layout="wide")
+st.title("🏆 黃金多空因子量化儀表板")
 
-# --- 側邊欄：設定權重 ---
+# --- 側邊欄設定 ---
 st.sidebar.header("1. 設定因子權重 (%)")
 w_dxy = st.sidebar.slider("美元指數 (DXY)", 0, 100, 30)
 w_vix = st.sidebar.slider("避險情緒 (VIX)", 0, 100, 20)
-w_rate = st.sidebar.slider("美債收益率 (10Y)", 0, 100, 50)
+w_rate = st.sidebar.slider("10Y美債收益率", 0, 100, 50)
 
-if w_dxy + w_vix + w_rate != 100:
-    st.sidebar.error("⚠️ 權重總和必須等於 100%")
+# --- 數據抓取 (改用更穩定的字典對應) ---
+tickers = {
+    "Gold": "GC=F", 
+    "DXY": "DX-Y.NYB", 
+    "VIX": "^VIX", 
+    "10Y_Bond": "^TNX"
+}
 
-# --- 數據抓取 ---
 @st.cache_data(ttl=3600)
-def fetch_data():
-    # 抓取金價、美元、VIX、10年債
-    tickers = {"Gold": "GC=F", "DXY": "DX-Y.NYB", "VIX": "^VIX", "10Y_Bond": "^TNX"}
-    df = yf.download(list(tickers.values()), period="1mo", interval="1d")['Close']
-    df.columns = tickers.keys()
-    return df
+def get_clean_data():
+    df = yf.download(list(tickers.values()), period="1mo")['Close']
+    # 確保欄位名稱對應正確
+    inv_tickers = {v: k for k, v in tickers.items()}
+    df = df.rename(columns=inv_tickers)
+    return df.dropna()
 
-data = fetch_data()
-current = data.iloc[-1]
-prev = data.iloc[-2]
+try:
+    df = get_clean_data()
+    curr = df.iloc[-1]
+    prev = df.iloc[-2]
 
-# --- 評分邏輯 (歸一化範例) ---
-def calculate_score():
-    # 美元下跌為利多 (+), 上漲為利空 (-)
-    s_dxy = 1 if current['DXY'] < prev['DXY'] else -1
-    # VIX 上漲為利多 (+), 下跌為利空 (-)
-    s_vix = 1 if current['VIX'] > prev['VIX'] else -1
-    # 利率下跌為利多 (+), 上漲為利空 (-)
-    s_rate = 1 if current['10Y_Bond'] < prev['10Y_Bond'] else -1
+    # --- 計算得分邏輯 ---
+    # 美元跌 = 金價利多(+1)
+    s_dxy = 1 if curr['DXY'] < prev['DXY'] else -1
+    # VIX 漲 = 金價利多(+1)
+    s_vix = 1 if curr['VIX'] > prev['VIX'] else -1
+    # 利率跌 = 金價利多(+1)
+    s_rate = 1 if curr['10Y_Bond'] < prev['10Y_Bond'] else -1
     
-    total_score = (s_dxy * w_dxy + s_vix * w_vix + s_rate * w_rate) / 100
-    return s_dxy, s_vix, s_rate, total_score
+    final_score = (s_dxy * w_dxy + s_vix * w_vix + s_rate * w_rate) / 100
 
-s_dxy, s_vix, s_rate, final_score = calculate_score()
+    # --- 儀表板視覺化 ---
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("當前金價 (期貨)", f"${curr['Gold']:.1f}", f"{(curr['Gold']-prev['Gold']):.1f}")
+    col2.metric("美元指數 (DXY)", f"{curr['DXY']:.2f}", f"{(curr['DXY']-prev['DXY']):.2f}", delta_color="inverse")
+    col3.metric("10Y美債收益率", f"{curr['10Y_Bond']:.2f}%", f"{(curr['10Y_Bond']-prev['10Y_Bond']):.2f}%", delta_color="inverse")
+    col4.metric("VIX 恐慌指數", f"{curr['VIX']:.2f}", f"{(curr['VIX']-prev['VIX']):.2f}")
 
-# --- 儀表板顯示 ---
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("當前金價", f"${current['Gold']:.2f}", f"{(current['Gold']-prev['Gold']):.2f}")
-col2.metric("美元指數", f"{current['DXY']:.2f}", f"{(current['DXY']-prev['DXY']):.2f}", delta_color="inverse")
-col3.metric("10Y美債收益率", f"{current['10Y_Bond']:.2f}%", f"{(current['10Y_Bond']-prev['10Y_Bond']):.2f}%", delta_color="inverse")
-col4.metric("VIX 恐慌指數", f"{current['VIX']:.2f}", f"{(current['VIX']-prev['VIX']):.2f}")
+    st.divider()
 
-st.divider()
+    # --- 決策區塊 ---
+    st.subheader("💡 綜合量化建議")
+    if final_score >= 0.2:
+        st.success(f"綜合得分：{final_score:.2f} | 訊號：【偏多】各項指標有利於金價上漲。")
+    elif final_score <= -0.2:
+        st.error(f"綜合得分：{final_score:.2f} | 訊號：【偏空】環境不利於持有黃金。")
+    else:
+        st.warning(f"綜合得分：{final_score:.2f} | 訊號：【中性】指標互相抵銷，建議觀望。")
 
-# --- 決策建議 ---
-st.subheader("💡 量化決策建議")
-if final_score > 0.2:
-    st.success(f"綜合得分：{final_score:.2f} | 訊號：強力看多 (建議分批入場)")
-elif final_score < -0.2:
-    st.error(f"綜合得分：{final_score:.2f} | 訊號：強力看空 (建議減持或避險)")
-else:
-    st.warning(f"綜合得分：{final_score:.2f} | 訊號：震盪觀望 (方向不明)")
+    # --- 圖表區 ---
+    st.subheader("📈 因子走勢對照 (歸一化百分比)")
+    # 為了方便在同一張圖比較，我們看變動百分比
+    df_pct = (df / df.iloc[0] * 100)
+    st.line_chart(df_pct)
 
-# --- 圖表分析 ---
-st.subheader("📈 關鍵因子趨勢對照")
-st.line_chart(data[['Gold', 'DXY', 'VIX']])
+except Exception as e:
+    st.error(f"數據讀取中或發生錯誤: {e}")
+    st.info("提示：請檢查網路連接，或稍後再試（市場關閉期間部分數據可能缺失）。")
