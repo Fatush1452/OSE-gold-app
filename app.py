@@ -101,4 +101,30 @@ if df is not None:
     score_col, advice_col = st.columns([1, 2])
     
     with score_col:
-        if display_score > 5
+        if display_score > 50:
+            st.markdown(f"<h1 style='color: #2ecc71;'>{display_score:.0f} 分 (看多)</h1>", unsafe_allow_html=True)
+        elif display_score < 50:
+            st.markdown(f"<h1 style='color: #e74c3c;'>{display_score:.0f} 分 (看空)</h1>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<h1 style='color: #f1c40f;'>50 分 (中性)</h1>", unsafe_allow_html=True)
+
+    with advice_col:
+        st.write("### 戰略建議")
+        if display_score >= 75:
+            st.success("🟢 **強力利多**：內外部因子同步共振，看漲趨勢明確。")
+        elif display_score > 50:
+            st.info("🟡 **偏多觀望**：整體環境偏好，可分批建立多單。")
+        elif display_score == 50:
+            st.warning("⚪ **中性**：多空指標抵銷，建議維持低水位觀望。")
+        else:
+            st.error("🔴 **看空/風險**：環境不利或需求疲軟，應注意回檔風險。")
+
+    st.divider()
+
+    # --- 區塊 D：歸一化圖表 ---
+    st.subheader("📈 因子趨勢對照 (歸一化 100%)")
+    df_pct = (df / df.iloc[0] * 100)
+    st.line_chart(df_pct)
+
+else:
+    st.warning("暫時無法獲取行情數據，請確認網路連線或稍後再試。")
