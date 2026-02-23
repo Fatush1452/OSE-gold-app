@@ -5,7 +5,7 @@ from datetime import datetime
 import pytz
 
 # --- 1. 設定區 ---
-LOGO_URL = "https://raw.githubusercontent.com/Fatush1452/OSE-gold-app/main/logo.png"
+LOGO_URL = "https://raw.githubusercontent.com/Fatush1452/OSE-gold-app/main/OSE.png"
 st.set_page_config(page_title="黃金量化分析儀表板", layout="wide")
 
 # --- 2. 顯示 Logo 與 標題 (優化對齊) ---
