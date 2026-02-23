@@ -41,7 +41,7 @@ if w_dxy + w_vix + w_rate + w_ose != 100:
 # --- 5. 數據與新聞抓取函數 ---
 
 # 抓取 CNBC 黃金新聞 (RSS)
-@st.cache_data(ttl=43200) # 設定 12 小時更新一次
+@st.cache_data(ttl=10) # 設定 12 小時更新一次
 def get_gold_news():
     try:
         # Yahoo Finance Gold RSS feed
