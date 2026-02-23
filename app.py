@@ -3,24 +3,20 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 import pytz
+import feedparser  # 請確保 requirements.txt 中有加入此套件
 
 # --- 1. 設定區 ---
-LOGO_URL = "https://raw.githubusercontent.com/Fatush1452/OSE-gold-app/main/OSE.png"
+LOGO_URL = "https://raw.githubusercontent.com/Fatush1452/OSE-gold-app/main/logo.png"
 st.set_page_config(page_title="黃金量化分析儀表板", layout="wide")
 
-# --- 2. 顯示 Logo 與 標題 (優化對齊) ---
-# 使用 vertical_alignment="center" 確保圖片和文字中心點對齊
+# --- 2. 顯示 Logo 與 標題 ---
 t_col1, t_col2 = st.columns([1, 4], vertical_alignment="center")
-
 with t_col1:
     try:
-        # 調整 width 為 220 (可依喜好微調)，並移除頂部間距
         st.image(LOGO_URL, width=220)
     except:
         st.write("🏮 [Logo]")
-
 with t_col2:
-    # 使用 Markdown 語法稍微調整標題的字體大小與邊距，使其與 Logo 更和諧
     st.markdown("<h1 style='margin:0;'>黃金多空因子量化儀表板</h1>", unsafe_allow_html=True)
 
 # --- 3. 更新時間 (台北) ---
@@ -39,32 +35,56 @@ st.sidebar.divider()
 st.sidebar.header("2. OSE 買進需求評分")
 ose_input = st.sidebar.number_input("OSE 需求強度 (1-5)", min_value=1, max_value=5, value=3, step=1)
 
-total_w = w_dxy + w_vix + w_rate + w_ose
-if total_w != 100:
-    st.sidebar.error(f"⚠️ 權重總和：{total_w}% (須為 100%)")
+if w_dxy + w_vix + w_rate + w_ose != 100:
+    st.sidebar.error("⚠️ 權重總和須為 100%")
 
-# --- 5. 數據抓取 ---
-tickers = {"Gold": "GC=F", "DXY": "DX-Y.NYB", "VIX": "^VIX", "10Y_Bond": "^TNX"}
+# --- 5. 數據與新聞抓取函數 ---
+
+# 抓取 Yahoo Finance 黃金新聞 (RSS)
+@st.cache_data(ttl=86400) # 設定 24 小時更新一次
+def get_gold_news():
+    try:
+        # Yahoo Finance Gold RSS feed
+        rss_url = "https://finance.yahoo.com/news/category-commodities/rss"
+        feed = feedparser.parse(rss_url)
+        news_list = []
+        for entry in feed.entries[:5]: # 只取前 5 則相關新聞
+            news_list.append({"title": entry.title, "link": entry.link})
+        return news_list
+    except:
+        return []
 
 @st.cache_data(ttl=600)
-def get_data():
+def get_market_data():
+    tickers = {"Gold": "GC=F", "DXY": "DX-Y.NYB", "VIX": "^VIX", "10Y_Bond": "^TNX"}
     try:
         df = yf.download(list(tickers.values()), period="2mo")['Close']
-        inv_tickers = {v: k for k, v in tickers.items()}
-        df = df.rename(columns=inv_tickers)
-        df = df.ffill().dropna()
+        df = df.rename(columns={v: k for k, v in tickers.items()}).ffill().dropna()
         return df
     except:
         return None
 
-df = get_data()
+# --- 6. 執行抓取 ---
+news_data = get_gold_news()
+df = get_market_data()
 
-# --- 6. 畫面顯示邏輯 ---
+# --- 7. 畫面顯示邏輯 ---
+
+# A. 即時新聞區塊 (置於標題與指數之間)
+st.subheader("📰 即時黃金與大宗商品新聞")
+if news_data:
+    for news in news_data:
+        st.markdown(f"● [{news['title']}]({news['link']})")
+else:
+    st.write("暫時無法取得即時新聞。")
+
+st.divider()
+
 if df is not None and len(df) >= 2:
     curr = df.iloc[-1]
     prev = df.iloc[-2]
 
-    # 即時數據指標
+    # B. 即時數據指標
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("當前金價 (期貨)", f"${curr['Gold']:.1f}", f"{(curr['Gold']-prev['Gold']):.1f}")
     m2.metric("美元指數 (DXY)", f"{curr['DXY']:.2f}", f"{(curr['DXY']-prev['DXY']):.2f}", delta_color="inverse")
@@ -72,32 +92,21 @@ if df is not None and len(df) >= 2:
     m4.metric("VIX 恐慌指數", f"{curr['VIX']:.2f}", f"{(curr['VIX']-prev['VIX']):.2f}")
 
     with st.expander("📖 因子解讀指南"):
-        g_col1, g_col2, g_col3 = st.columns(3)
-        g_col1.write("**美元指數 (DXY)** \n與金價反向。")
-        g_col2.write("**10Y美債收益率** \n與金價反向。")
-        g_col3.write("**VIX 恐慌指數** \n與金價正向。")
+        st.write("美元/美債收益率與金價反向，VIX則通常與金價正向。")
 
     st.divider()
 
-    # 指數走勢圖
+    # C. 指數走勢圖
     st.subheader("📈 外部因子走勢追蹤")
     c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.caption("黃金現價趨勢")
-        st.line_chart(df['Gold'], height=150)
-    with c2:
-        st.caption("美元指數 (DXY)")
-        st.line_chart(df['DXY'], height=150)
-    with c3:
-        st.caption("10Y美債收益率")
-        st.line_chart(df['10Y_Bond'], height=150)
-    with c4:
-        st.caption("VIX 恐慌指數")
-        st.line_chart(df['VIX'], height=150)
+    with c1: st.line_chart(df['Gold'], height=150)
+    with c2: st.line_chart(df['DXY'], height=150)
+    with c3: st.line_chart(df['10Y_Bond'], height=150)
+    with c4: st.line_chart(df['VIX'], height=150)
 
     st.divider()
 
-    # 綜合量化結論計算
+    # D. 綜合結論
     s_dxy = 1 if curr['DXY'] < prev['DXY'] else -1
     s_vix = 1 if curr['VIX'] > prev['VIX'] else -1
     s_rate = 1 if curr['10Y_Bond'] < prev['10Y_Bond'] else -1
@@ -108,21 +117,13 @@ if df is not None and len(df) >= 2:
 
     st.subheader("💡 綜合量化結論")
     score_col, advice_col = st.columns([1, 2])
-    
     with score_col:
-        if display_score > 50:
-            st.markdown(f"<h1 style='color: #2ecc71;'>{display_score:.0f} 分 (看多)</h1>", unsafe_allow_html=True)
-        elif display_score < 50:
-            st.markdown(f"<h1 style='color: #e74c3c;'>{display_score:.0f} 分 (看空)</h1>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<h1 style='color: #f1c40f;'>50 分 (中性)</h1>", unsafe_allow_html=True)
-
+        color = "#2ecc71" if display_score > 50 else "#e74c3c" if display_score < 50 else "#f1c40f"
+        st.markdown(f"<h1 style='color: {color};'>{display_score:.0f} 分</h1>", unsafe_allow_html=True)
     with advice_col:
-        st.write("### 戰略建議")
-        if display_score >= 75: st.success("🟢 **強力利多**：內外部指標共振，看漲機率高。")
-        elif display_score > 50: st.info("🟡 **偏多觀望**：環境整體利多，但需留意短期震盪。")
-        elif display_score == 50: st.warning("⚪ **中性**：多空因子相互抵消，建議靜待方向。")
-        else: st.error("🔴 **看空/避險**：指標顯示下行風險較大，應審慎持有。")
+        if display_score > 50: st.success("🟢 建議：環境利多。")
+        elif display_score < 50: st.error("🔴 建議：避險看空。")
+        else: st.warning("⚪ 建議：中性觀望。")
 
 else:
-    st.warning("📊 正在嘗試連線至金融資料源，請稍候頁面自動刷新...")
+    st.warning("數據更新中，請稍候...")
