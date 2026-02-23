@@ -40,12 +40,12 @@ if w_dxy + w_vix + w_rate + w_ose != 100:
 
 # --- 5. 數據與新聞抓取函數 ---
 
-# 抓取 Yahoo Finance 黃金新聞 (RSS)
-@st.cache_data(ttl=86400) # 設定 24 小時更新一次
+# 抓取 CNBC 黃金新聞 (RSS)
+@st.cache_data(ttl=43200) # 設定 12 小時更新一次
 def get_gold_news():
     try:
         # Yahoo Finance Gold RSS feed
-        rss_url = "https://finance.yahoo.com/news/category-commodities/rss"
+        rss_url = "https://www.cnbc.com/id/15839072/device/rss/rss.html"
         feed = feedparser.parse(rss_url)
         news_list = []
         for entry in feed.entries[:5]: # 只取前 5 則相關新聞
