@@ -7,7 +7,7 @@ import feedparser
 
 # --- 1. 設定區 ---
 # 請確認此連結在瀏覽器能直接看到圖片
-LOGO_URL = "https://raw.githubusercontent.com/Fatush1452/OSE-gold-app/main/logo.png"
+LOGO_URL = "https://raw.githubusercontent.com/Fatush1452/OSE-gold-app/main/OSE.png"
 
 st.set_page_config(page_title="黃金量化分析儀表板", layout="wide")
 
