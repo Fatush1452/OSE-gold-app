@@ -5,18 +5,23 @@ from datetime import datetime
 import pytz
 
 # --- 1. 設定區 ---
-LOGO_URL = "https://raw.githubusercontent.com/Fatush1452/OSE-gold-app/main/OSE.png"
+LOGO_URL = "https://raw.githubusercontent.com/Fatush1452/OSE-gold-app/main/logo.png"
 st.set_page_config(page_title="黃金量化分析儀表板", layout="wide")
 
-# --- 2. 顯示 Logo 與 標題 ---
-t_col1, t_col2 = st.columns([1, 3])
+# --- 2. 顯示 Logo 與 標題 (優化對齊) ---
+# 使用 vertical_alignment="center" 確保圖片和文字中心點對齊
+t_col1, t_col2 = st.columns([1, 4], vertical_alignment="center")
+
 with t_col1:
     try:
-        st.image(LOGO_URL, width=250)
+        # 調整 width 為 220 (可依喜好微調)，並移除頂部間距
+        st.image(LOGO_URL, width=220)
     except:
         st.write("🏮 [Logo]")
+
 with t_col2:
-    st.title("黃金多空因子量化儀表板")
+    # 使用 Markdown 語法稍微調整標題的字體大小與邊距，使其與 Logo 更和諧
+    st.markdown("<h1 style='margin:0;'>黃金多空因子量化儀表板</h1>", unsafe_allow_html=True)
 
 # --- 3. 更新時間 (台北) ---
 tw_tz = pytz.timezone('Asia/Taipei')
@@ -38,17 +43,15 @@ total_w = w_dxy + w_vix + w_rate + w_ose
 if total_w != 100:
     st.sidebar.error(f"⚠️ 權重總和：{total_w}% (須為 100%)")
 
-# --- 5. 數據抓取 (加強防錯版本) ---
+# --- 5. 數據抓取 ---
 tickers = {"Gold": "GC=F", "DXY": "DX-Y.NYB", "VIX": "^VIX", "10Y_Bond": "^TNX"}
 
 @st.cache_data(ttl=600)
 def get_data():
     try:
-        # 增加抓取天數到 2 個月，確保週末過後有足夠緩衝資料
         df = yf.download(list(tickers.values()), period="2mo")['Close']
         inv_tickers = {v: k for k, v in tickers.items()}
         df = df.rename(columns=inv_tickers)
-        # 先前向填充缺失值，再刪除完全沒數據的行
         df = df.ffill().dropna()
         return df
     except:
@@ -56,28 +59,27 @@ def get_data():
 
 df = get_data()
 
-# --- 6. 核心判斷：檢查資料是否為空 ---
+# --- 6. 畫面顯示邏輯 ---
 if df is not None and len(df) >= 2:
     curr = df.iloc[-1]
     prev = df.iloc[-2]
 
-    # --- 區塊 A：即時數據指標 ---
+    # 即時數據指標
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("當前金價 (期貨)", f"${curr['Gold']:.1f}", f"{(curr['Gold']-prev['Gold']):.1f}")
     m2.metric("美元指數 (DXY)", f"{curr['DXY']:.2f}", f"{(curr['DXY']-prev['DXY']):.2f}", delta_color="inverse")
     m3.metric("10Y美債收益率", f"{curr['10Y_Bond']:.2f}%", f"{(curr['10Y_Bond']-prev['10Y_Bond']):.2f}%", delta_color="inverse")
     m4.metric("VIX 恐慌指數", f"{curr['VIX']:.2f}", f"{(curr['VIX']-prev['VIX']):.2f}")
 
-    # --- 區塊 B：因子解讀指南 ---
     with st.expander("📖 因子解讀指南"):
         g_col1, g_col2, g_col3 = st.columns(3)
-        g_col1.write("**美元指數 (DXY)** \n與金價**反向**。")
-        g_col2.write("**10Y美債收益率** \n與金價**反向**。")
-        g_col3.write("**VIX 恐慌指數** \n與金價**正向**。")
+        g_col1.write("**美元指數 (DXY)** \n與金價反向。")
+        g_col2.write("**10Y美債收益率** \n與金價反向。")
+        g_col3.write("**VIX 恐慌指數** \n與金價正向。")
 
     st.divider()
 
-    # --- 區塊 C：四個外部因子的即時走勢圖 ---
+    # 指數走勢圖
     st.subheader("📈 外部因子走勢追蹤")
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -95,7 +97,7 @@ if df is not None and len(df) >= 2:
 
     st.divider()
 
-    # --- 區塊 D：綜合量化結論 ---
+    # 綜合量化結論計算
     s_dxy = 1 if curr['DXY'] < prev['DXY'] else -1
     s_vix = 1 if curr['VIX'] > prev['VIX'] else -1
     s_rate = 1 if curr['10Y_Bond'] < prev['10Y_Bond'] else -1
@@ -117,12 +119,10 @@ if df is not None and len(df) >= 2:
 
     with advice_col:
         st.write("### 戰略建議")
-        if display_score >= 75: st.success("🟢 **強力利多**：指標高度共振。")
-        elif display_score > 50: st.info("🟡 **偏多觀望**：環境整體偏好。")
-        elif display_score == 50: st.warning("⚪ **中性**：建議觀望。")
-        else: st.error("🔴 **看空建議**：規避下行風險。")
+        if display_score >= 75: st.success("🟢 **強力利多**：內外部指標共振，看漲機率高。")
+        elif display_score > 50: st.info("🟡 **偏多觀望**：環境整體利多，但需留意短期震盪。")
+        elif display_score == 50: st.warning("⚪ **中性**：多空因子相互抵消，建議靜待方向。")
+        else: st.error("🔴 **看空/避險**：指標顯示下行風險較大，應審慎持有。")
 
 else:
-    # 當數據抓不到時，顯示友善提示而非 Error
-    st.warning("📊 正在嘗試連線至金融資料源... 若持續出現此訊息，可能是因為目前處於開盤交替時段數據尚未產出，請稍後幾分鐘再重新整理頁面。")
-    st.info("提示：您可以檢查側邊欄的 OSE 自評因子是否正確設定。")
+    st.warning("📊 正在嘗試連線至金融資料源，請稍候頁面自動刷新...")
